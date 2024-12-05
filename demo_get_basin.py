@@ -2,8 +2,8 @@
 # -*- coding: utf-8; mode: python -*-
 r"""
 
-get_friver_grids
-~~~~~~~~~~~~~~~~
+demo_get_basin
+~~~~~~~~~~~~~~
 """
 # Standard Imports
 import os
@@ -12,12 +12,13 @@ import glob
 
 # Third-Party Imports
 import numpy as np
+import numpy.typing as npt
 import numpy.ma as ma
 import pandas
 import geopandas
 import cartopy.crs as ccrs
-import cartopy
-import pyproj
+# import cartopy
+# import pyproj
 import matplotlib.pyplot as plt
 from matplotlib import colors as mcolors
 import cartopy.feature as cf
@@ -29,15 +30,10 @@ import pystare
 import starepandas
 
 # Local Imports
-# from snodas_defs import SRC_DIR, SRC_SDIR, ALT_DIR, PPPP_TITLE, PPPP_VAR, TS_FMT
-# from snodas_defs import QLEV, N_PARTS, N_CORES, LON_TO_180, LON_TO_360
-# from snodas_defs import WINTAG_EXT, WINTAG_DEF
-# from get_basins_idx import get_basins_idx
-# from get_basins import get_basins
 
 ##
 # List of Public objects from this module.
-__all__ = ['demo_get_grids']
+__all__ = ['demo_get_basin']
 
 ##
 # Markup Language Specification (see NumpyDoc Python Style Guide https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -72,9 +68,16 @@ Q-10 ~Length Scale:    10 km      Q-24  ~Length Scale:  0.000610352 km
 Q-11 ~Length Scale:     5 km      Q-25  ~Length Scale:  0.000305176 km
 Q-12 ~Length Scale:   2.5 km      Q-26  ~Length Scale:  0.000152588 km
 Q-13 ~Length Scale:  1.25 km      Q-27  ~Length Scale:  7.62939E-05 km
+
 """
-#       0   1   2   3   4   5
-QLEV = [10, 12, 15, 16, 17, 18][0]
+#       0   1   2   3   4   5   6
+QLEV = [10, 12, 14, 15, 16, 17, 18][6]
+
+#             0   1   2   3   4   5   6
+QLEV_BASIN = [10, 12, 14, 15, 16, 17, 18][6]
+
+#             0   1   2   3   4   5   6
+QLEV_DGRID = [10, 12, 14, 15, 16, 17, 18][2]
 
 ##
 # Parallel computing settings.
@@ -93,7 +96,7 @@ PC_CRS = ccrs.PlateCarree(central_longitude=LON_0_GLOBAL)
 ##
 # Set data source base path
 if SRC_DSET == "SNODAS":
-    SRC_DIR = "/Volumes/saved/data/SNODAS/snodas/"
+    SRC_DIR = "/Volumes/saved/data/SNODAS/"
     SRC_SDIR = ("ssmv11034tS__T0001/", "ssmv11038wS__A0024/", "ssmv11044bS__T0024/", "ssmv11036tS__T0001/")[0]
 elif SRC_DSET == "IMERG":
     SRC_DIR = "/Volumes/saved/data/GOES/IMERG/"
@@ -101,7 +104,7 @@ elif SRC_DSET == "IMERG":
 elif SRC_DSET == "MODIS":
     SRC_DIR = "/Volumes/saved/data/MODIS/"
     SRC_SDIR = ''
-ALT_DIR = "/Volumes/saved/hidden/stare2grid/"
+ALT_DIR = "/Volumes/saved/hidden/STAREpull/"
 COM_DIR = "/Volumes/saved/common/"
 
 ###############################################################################
@@ -122,7 +125,26 @@ def ij2grid(j: int, i: int, im: int, jm: int) -> int:
 ###############################################################################
 # PUBLIC plot_conusw()
 # --------------------
-def plot_conusw(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, snodas_w_masked_gids) -> None:
+def plot_conusw(pname: str, snodas_lats2d: npt.ArrayLike, snodas_lons2d: npt.ArrayLike, snodas_npts: int, snodas_nlats: int, snodas_nlons: int, snodas_w_masked_gids: list[int]) -> None:
+    """Plot CONUS West SNODAS grids.
+
+    Parameters
+    ----------
+    pname : str
+        Plot name/path
+    snodas_lats2d : npt.ArrayLike
+        Datagrid latitudes
+    snodas_lons2d : npt.ArrayLike
+        Datagrid longitudes
+    snodas_npts : int
+        Number of SNODAS grids
+    snodas_nlats : int
+        Number of SNODAS grid latitudes
+    snodas_nlons : int
+        Number of SNODAS grid longitudes
+    snodas_w_masked_gids : list[int]
+        List of SNODAS grid indices
+    """
     opts = {'projection': PC_CRS}
     fig, geo_axes = plt.subplots(figsize=(16, 9), dpi=PLOT_DPI, subplot_kw=opts)
     min_lat, max_lat = np.min(snodas_lats2d), np.max(snodas_lats2d)
@@ -134,11 +156,11 @@ def plot_conusw(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, 
     geo_axes.add_feature(cf.COASTLINE)
     geo_axes.add_feature(cf.BORDERS)
     tmp = np.zeros((snodas_npts,))
-    tmp[snodas_w_masked_gids] = 1
+    tmp[snodas_w_masked_gids] = 0.3
     tmp = ma.masked_equal(tmp, 0)
     tmp = np.reshape(tmp, (snodas_nlats, snodas_nlons))
-    norm = mcolors.Normalize(vmin=np.amin(tmp), vmax=np.amax(tmp))
-    plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm)
+    norm = mcolors.Normalize(vmin=0.0, vmax=1.0)
+    plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm, alpha=1)
     fig.savefig(pname, dpi=PLOT_DPI, facecolor='w', edgecolor='w',
                 orientation='landscape', bbox_inches='tight', pad_inches=0.02)
     plt.clf()
@@ -148,7 +170,24 @@ def plot_conusw(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, 
 ###############################################################################
 # PUBLIC plot_conus_regions()
 # ---------------------------
-def plot_conus_regions(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons) -> None:
+def plot_conus_regions(pname: str, snodas_lats2d: npt.ArrayLike, snodas_lons2d: npt.ArrayLike, snodas_npts: int, snodas_nlats: int, snodas_nlons: int) -> None:
+    """Plot CONUS example regions.
+
+    Parameters
+    ----------
+    pname : str
+        Plot name/path
+    snodas_lats2d : npt.ArrayLike
+        Datagrid latitudes
+    snodas_lons2d : npt.ArrayLike
+        Datagrid longitudes
+    snodas_npts : int
+        Number of SNODAS grids
+    snodas_nlats : int
+        Number of SNODAS grid latitudes
+    snodas_nlons : int
+        Number of SNODAS grid longitudes
+    """
     opts = {'projection': PC_CRS}
     fig, geo_axes = plt.subplots(figsize=(16, 9), dpi=PLOT_DPI, subplot_kw=opts)
     min_lat, max_lat = np.min(snodas_lats2d), np.max(snodas_lats2d)
@@ -170,13 +209,45 @@ def plot_conus_regions(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_
 ###############################################################################
 # PUBLIC plot_grids()
 # --------------------
-def plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, the_grids, basin_roi, add_trixels, zoomin) -> None:
+def plot_grids(pname: str, snodas_lats2d: npt.ArrayLike, snodas_lons2d: npt.ArrayLike, snodas_npts: int, snodas_nlats: int, snodas_nlons: int, the_grids: list[int], basin_roi: starepandas.staredataframe.STAREDataFrame, dgrid_roi: starepandas.staredataframe.STAREDataFrame, add_trixels: bool, flip_trixels: bool, trixel_double: bool, zoomin: bool) -> None:
+    """Plot basin grids and trixels
+
+    Parameters
+    ----------
+    pname : str
+        Plot name/path
+    snodas_lats2d : npt.ArrayLike
+        Datagrid latitudes
+    snodas_lons2d : npt.ArrayLike
+        Datagrid longitudes
+    snodas_npts : int
+        Number of SNODAS grids
+    snodas_nlats : int
+        Number of SNODAS grid latitudes
+    snodas_nlons : int
+        Number of SNODAS grid longitudes
+    the_grids : list[int]
+        List of SNODAS grid basin indices to plot
+    basin_roi : starepandas.staredataframe.STAREDataFrame
+        Basin STARE DF with trixels
+    dgrid_roi : starepandas.staredataframe.STAREDataFrame
+        Datagrid STARE DF with trixels
+    add_trixels : bool
+        Flag to add basin trixels
+    flip_trixels : bool
+        Flag to do a reverse and show datagrid trixels and basin polygon (use_trixels must be True)
+    trixel_double: bool
+        Flag to show basin and datagrid trixels rather than datagrids
+    zoomin : bool
+        Flag to zoom in on basin
+    """
     opts = {'projection': PC_CRS}
     fig, geo_axes = plt.subplots(figsize=(16, 9), dpi=PLOT_DPI, subplot_kw=opts)
     min_lat, max_lat = np.min(snodas_lats2d), np.max(snodas_lats2d)
     min_lon, max_lon = LON_TO_360(np.min(snodas_lons2d)), LON_TO_360(np.max(snodas_lons2d))
     map_extent = (LON_TO_180(min_lon), LON_TO_180(max_lon), min_lat, max_lat)
     use_dpi = PLOT_DPI
+
     if zoomin:
         use_dpi = PLOT_DPI * 2
         if pname.find("sierra") != -1:
@@ -185,39 +256,58 @@ def plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, s
             map_extent = (LON_TO_180(-122.1), LON_TO_180(-119.6), 39.3, 40.6)
         elif pname.find("tuolumne") != -1:
             map_extent = (LON_TO_180(-120.68), LON_TO_180(-119.1), 37.5, 38.3)
+
     geo_axes.set_extent(map_extent, crs=FLAT_CRS)
     extent = (min_lon, max_lon, min_lat, max_lat)
     # Add coastlines
     geo_axes.add_feature(cf.COASTLINE)
     geo_axes.add_feature(cf.BORDERS)
     tmp = np.zeros((snodas_npts,))
-    tmp[the_grids] = 1
+    tmp[the_grids] = 0.3
     tmp = ma.masked_equal(tmp, 0)
     tmp = np.reshape(tmp, (snodas_nlats, snodas_nlons))
-    norm = mcolors.Normalize(vmin=np.amin(tmp), vmax=np.amax(tmp))
-    # if pname.find("sierra") != -1:
-    #     ##
-    #     # Plot Sierra Nevada Conservancy Area
-    #     basin_dat_proj = basin_roi.to_crs(PC_CRS)
-    #     basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='r', edgecolor='r', linewidth=0.1, zorder=3)
-    # elif pname.find("feather") != -1:
-    #     ##
-    #     # Plot the Feather River Watershed Improvement Program (WIP) Boundary
-    #     basin_dat_proj = basin_roi.to_crs(PC_CRS)
-    #     basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='r', edgecolor='r', linewidth=0.1, zorder=3)
-    # elif pname.find("tuolumne") != -1:
-    #     ##
-    #     # Plot the Tuolumne River Watershed Improvement Program (WIP) Boundary
-    #     basin_dat_proj = basin_roi.to_crs(PC_CRS)
-    #     basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='r', edgecolor='r', linewidth=0.1, zorder=3)
+    norm = mcolors.Normalize(vmin=0.0, vmax=1.0)
 
-    if add_trixels:
-        # Plots the trixels
-        basin_roi.plot(ax=geo_axes, trixels=True, boundary=True, figsize=(16, 9), aspect=None, zorder=3,
-                       linewidth=0.5, color='r', alpha=0.7, transform=GEOD_CRS)
-        plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm, zorder=2)
+    if flip_trixels:
+            ##
+            # Plot the basin datagrids
+            plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm, zorder=1)
+            #
+            # Plot the trixels
+            dgrid_roi.plot(ax=geo_axes, trixels=True, boundary=True, figsize=(16, 9), aspect=None, zorder=2,
+                           linewidth=0.5, color='r', alpha=0.7, transform=GEOD_CRS)
+            ##
+            # Plot the basin polygon
+            if pname.find("sierra") != -1:
+                ##
+                # Plot Sierra Nevada Conservancy Area
+                basin_dat_proj = basin_roi.to_crs(PC_CRS)
+                basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='none', edgecolor='k', linewidth=0.2, zorder=3)
+            elif pname.find("feather") != -1:
+                ##
+                # Plot the Feather River Watershed Improvement Program (WIP) Boundary
+                basin_dat_proj = basin_roi.to_crs(PC_CRS)
+                # basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='none', edgecolor='k', linewidth=0.2, zorder=4)
+                basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='k', edgecolor='k', linewidth=0.2, alpha=0.25, zorder=3)
+            elif pname.find("tuolumne") != -1:
+                ##
+                # Plot the Tuolumne River Watershed Improvement Program (WIP) Boundary
+                basin_dat_proj = basin_roi.to_crs(PC_CRS)
+                basin_dat_proj.plot(ax=geo_axes, kind='geo', facecolor='none', edgecolor='k', linewidth=0.2, zorder=3)
+    elif trixel_double:
+            # Plot the trixels
+            dgrid_roi.plot(ax=geo_axes, trixels=True, boundary=True, figsize=(16, 9), aspect=None, zorder=2,
+                           linewidth=0.5, color='b', alpha=0.7, transform=GEOD_CRS)
+            basin_roi.plot(ax=geo_axes, trixels=True, boundary=True, figsize=(16, 9), aspect=None, zorder=3,
+                           linewidth=0.25, color='r', alpha=1, transform=GEOD_CRS)
     else:
-        plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm, zorder=2)
+        if add_trixels:
+            # Plot the trixels
+            basin_roi.plot(ax=geo_axes, trixels=True, boundary=True, figsize=(16, 9), aspect=None, zorder=3,
+                           linewidth=0.5, color='r', alpha=0.7, transform=GEOD_CRS)
+            plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm, zorder=2)
+        else:
+            plt.pcolormesh(snodas_lons2d, snodas_lats2d, tmp, transform=PC_CRS, cmap='jet', norm=norm, zorder=2)
 
     fig.savefig(pname, dpi=use_dpi, facecolor='w', edgecolor='w',
                 orientation='landscape', bbox_inches='tight', pad_inches=0.02)
@@ -226,21 +316,48 @@ def plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, s
     return
 
 ###############################################################################
-# PUBLIC demo_get_grids()
+# PUBLIC demo_get_basin()
 # -------------------------
-def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot: bool, use_trixels: bool, verbose: bool) -> None:
+def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, make_dgrid: bool, make_grids:bool, make_plot: bool, use_trixels: bool, trixel_flip: bool, double_trixel: bool, verbose: bool) -> None:
+    """Demo to get basin grids and trixels.
 
-    sierra_nevada_pkl_file = f"{ALT_DIR}sierra_nevada_{QLEV:02d}.pkl"
-    feather_river_pkl_file = f"{ALT_DIR}feather_river_{QLEV:02d}.pkl"
-    tuolumne_river_pkl_file = f"{ALT_DIR}tuolumne_river_{QLEV:02d}.pkl"
-    #ca_bounds_file = f"{ALT_DIR}/ca-state-boundary/CA_State_TIGER2016.shp"
-    #basin_file = f"{SRC_DIR}basin_dat.pkl"
-    #lon_lat_file = f"{SRC_DIR}snodas_lonlat.nc"
-
+    Parameters
+    ----------
+    mixed_qlev : bool
+        Flag to use Use QLEV_BASIN and QLEV_DGRID rather than unified QLEV encodings
+    shrink_conusw: bool
+        Flag to use a narrow version of CONUS_W for faster graphics.
+    make_basins : bool
+        Flag to make basins STARE dataframes and pickle (read polygon and make sids), rather than read from a pickle file.
+    make_dgrid : bool
+        Flag to make datagrid STARE dataframes and pickle, rather than read from a pickle file.
+    make_grids : bool
+        Flag to using basin and datagrid STARE dataframes to find and save intersecting basin datagrids, rather than read from a pickle file.
+    make_plot : bool
+        Flag to plot things.
+    use_trixels : bool
+        Flag to use basin trixels in some plots.
+    trixel_flip: bool
+        Flag to do a reverse and show datagrid trixels and basin polygon (use_trixels must be True)
+    double_trixel: bool
+        Flag to show basin and datagrid trixels rather than datagrids
+    verbose : bool
+        Flag to print verbose output.
+    """
     if verbose:
         print(f"\nUsing QLEV {QLEV}")
 
+    if mixed_qlev:
+        sierra_nevada_pkl_file = f"{ALT_DIR}sierra_nevada_{QLEV_BASIN:02d}.pkl"
+        feather_river_pkl_file = f"{ALT_DIR}feather_river_{QLEV_BASIN:02d}.pkl"
+        tuolumne_river_pkl_file = f"{ALT_DIR}tuolumne_river_{QLEV_BASIN:02d}.pkl"
+    else:
+        sierra_nevada_pkl_file = f"{ALT_DIR}sierra_nevada_{QLEV:02d}.pkl"
+        feather_river_pkl_file = f"{ALT_DIR}feather_river_{QLEV:02d}.pkl"
+        tuolumne_river_pkl_file = f"{ALT_DIR}tuolumne_river_{QLEV:02d}.pkl"
+
     if make_basins:
+        use_qlev = QLEV_BASIN if mixed_qlev else QLEV
         ##
         # Get Sierra Nevada Basin
         sierra_nevada_file = f"{ALT_DIR}Sierra_Nevada_Conservancy_Boundary.geojson"
@@ -249,7 +366,7 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
         sierra_nevada_gdf_proj = sierra_nevada_gdf.to_crs(GEOD_CRS)
         # #
         # Get SIDs and cover geopandas.GeoDataFrame
-        sierra_nevada_sids = starepandas.sids_from_gdf(sierra_nevada_gdf_proj, level=QLEV)
+        sierra_nevada_sids = starepandas.sids_from_gdf(sierra_nevada_gdf_proj, level=use_qlev)
         sierra_nevada_roi = starepandas.STAREDataFrame(sierra_nevada_gdf_proj, sids=sierra_nevada_sids)
         ##
         # Add Trixels
@@ -269,7 +386,7 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
         # Get SIDs and cover geopandas.GeoDataFrame
         feather_wip_gdf.reset_index(inplace=True, drop=True)
         feather_wip_gdf_proj = feather_wip_gdf.to_crs(GEOD_CRS)
-        feather_sids = starepandas.sids_from_gdf(feather_wip_gdf_proj, level=QLEV) # , force_ccw=True
+        feather_sids = starepandas.sids_from_gdf(feather_wip_gdf_proj, level=use_qlev) # , force_ccw=True
         feather_river_roi = starepandas.STAREDataFrame(feather_wip_gdf_proj, sids=feather_sids)
         ##
         # Add Trixels
@@ -289,7 +406,7 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
         # Get SIDs and cover geopandas.GeoDataFrame
         tuolumne_wip_gdf.reset_index(inplace=True, drop=True)
         tuolumne_wip_gdf_proj = tuolumne_wip_gdf.to_crs(GEOD_CRS)
-        tuolumne_sids = starepandas.sids_from_gdf(tuolumne_wip_gdf_proj, level=QLEV) # , force_ccw=True
+        tuolumne_sids = starepandas.sids_from_gdf(tuolumne_wip_gdf_proj, level=use_qlev) # , force_ccw=True
         tuolumne_river_roi = starepandas.STAREDataFrame(tuolumne_wip_gdf_proj, sids=tuolumne_sids)
         ##
         # Add Trixels
@@ -316,9 +433,15 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
     ##
     # Read a src data file
     if SRC_DSET == "SNODAS":
-        basin_file = f"{ALT_DIR}snodas_{QLEV:02d}.pkl"
-        grid_file = f"{ALT_DIR}snodas_basin_grids_{QLEV:02d}.pkl"
-        if make_plk:
+        use_qlev = QLEV_DGRID if mixed_qlev else QLEV
+        basin_file = f"{ALT_DIR}snodas_{use_qlev:02d}.pkl"
+        if shrink_conusw:
+            basin_file = basin_file.replace(".pkl", "_shrink.pkl")
+        if mixed_qlev:
+            grid_file = f"{ALT_DIR}snodas_basin_grids_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.pkl"
+        else:
+            grid_file = f"{ALT_DIR}snodas_basin_grids_{use_qlev:02d}.pkl"
+        if make_dgrid:
             ##
             # Read the SNODAS datagrid lon/lats from src geotif
             ffiles = sorted(glob.glob(f'{SRC_DIR}{SRC_SDIR}*'))
@@ -423,7 +546,14 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
             snodas_w_external_npts                      : 2674288
             snodas_w_external_gids (2674288 of 23239185): [0, ... 23234017]
             """
-            sdfw = sdf_full[sdf_full['lons'] <= -110]
+            if shrink_conusw:
+                # Feather River
+                # Latitude: 40d 21' 28.19" N
+                # Longitude: -120d 27' 2.99" W
+                sdfw = sdf_full[sdf_full['lons'] <= -115]
+                sdfw = sdfw[sdfw['lats'] <= 45]
+            else:
+                sdfw = sdf_full[sdf_full['lons'] <= -110]
             sdfw.reset_index(drop=True, inplace = True)
             conusw_npnts = sdfw.shape[0]
 
@@ -434,15 +564,24 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
             snodas_w_masked_npts = conusw_masked_npts = sdfw_masked.shape[0]
             snodas_w_masked_gids = sdfw_masked['gids'].tolist()
 
-            snodas_w_sdf = starepandas.STAREDataFrame(sdfw, level=QLEV)
+            snodas_w_sdf = starepandas.STAREDataFrame(sdfw, level=use_qlev)
             lons = snodas_w_sdf['lons'].values
             lats = snodas_w_sdf['lats'].values
-            sids = pystare.from_latlon(lats, lons, QLEV)
+
+            ##
+            # Add SIDs
+            sids = pystare.from_latlon(lats, lons, use_qlev)
             snodas_w_sdf.set_sids(sids, inplace=True)
             snodas_w_npts = sdfw.shape[0]
             snodas_w_gids = sdf_extra['gids'].tolist()
+            ##
+            # Add Trixels
+            _trixels = snodas_w_sdf.make_trixels(sid_column='sids', wrap_lon=False, n_partitions=N_PARTS, num_workers=N_CORES)
+            snodas_w_sdf.set_trixels(_trixels, inplace=True)
             if verbose:
                 print(f"\n\tconusw_npnts         : {conusw_npnts:<20d}")
+                print(f"\tsnodas_w_lats          : ({len(lats)}) {lats.min():>+8.5g} <-> {lats.max():<+8.5g}")
+                print(f"\tsnodas_w_lons          : ({len(lons)}) {lons.min():>+8.5g} <-> {lons.max():<+8.5g}")
                 print(f"\tconusw_external_npts   : {conusw_external_npts:<20d}")
                 print(f"\tconusw_masked_npts     : {conusw_masked_npts:<20d}")
                 print(f"\tsnodas_w_npts          : {snodas_w_npts:<20d}")
@@ -538,81 +677,131 @@ def demo_get_grids(make_basins: bool, make_plk: bool, make_grids:bool, make_plot
         del odat
 
         if make_plot:
-            if add_trixels:
-                # geopandas.geodataframe.GeoDataFrame -> starepandas.staredataframe.STAREDataFrame
-                #          band_1       lats        lons                     geometry      gids                 sids                                            trixels
-                # 3094580      47  38.287498 -119.895828  POINT (38.28750 -119.89583)  12136830  3330935988229418282  POLYGON ((240.09873 38.18294, 240.14198 38.296...
-                # ...         ...        ...         ...                          ...       ...                  ...                                                ...
-                # 3250103       0  37.554169 -120.404167  POINT (37.55417 -120.40417)  12747049  3330855175224899338  POLYGON ((239.60562 37.65972, 239.56357 37.546...
-                # [10139 rows x 7 columns]
-                tuolumne_river_sdf = starepandas.STAREDataFrame(tuolumne_river_gdf,  sids='sids')
-                _trixels = tuolumne_river_sdf.make_trixels(sid_column='sids', wrap_lon=False, n_partitions=N_PARTS, num_workers=N_CORES)
-                tuolumne_river_sdf.set_trixels(_trixels, inplace=True)
+            if verbose:
+                print(f"\nMaking Plots ...")
+            # ##
+            # # Plot SNODAS_W
+            # if mixed_qlev:
+            #     pname = f"{ALT_DIR}snodas_w_masked_{QLEV_DGRID:02d}.png"
+            # else:
+            #     pname = f"{ALT_DIR}snodas_w_masked_{QLEV:02d}.png"
+            # plot_conusw(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, snodas_w_masked_gids)
+            # if verbose:
+            #     print(f"\nSaved {pname}")
+
+            # # ##
+            # # # Plot the Regions
+            # # pname = f"{ALT_DIR}snodas_regions_{QLEV:02d}.png"
+            # # plot_conus_regions(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons)
+            # # if verbose:
+            # #     print(f"Saved {pname}")
+
+            # ##
+            # # Plot the Sierra Nevada grids
+            # if mixed_qlev:
+            #     pname = f"{ALT_DIR}snodas_sierra_nevada_gids_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png"
+            # else:
+            #     pname = f"{ALT_DIR}snodas_sierra_nevada_gids_{QLEV:02d}.png"
+            # plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, sierra_nevada_gids, sierra_nevada_roi, snodas_w_sdf,
+            #            add_trixels=False, flip_trixels=False, trixel_double=False, zoomin=False)
+            # if verbose:
+            #     print(f"Saved {pname}")
+            # if mixed_qlev:
+            #     pname = f"{ALT_DIR}snodas_sierra_nevada_gids_zoomtrixel_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png" if use_trixels else f"{ALT_DIR}snodas_sierra_nevada_gids_zoom_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png"
+            # else:
+            #     pname = f"{ALT_DIR}snodas_sierra_nevada_gids_zoomtrixel_{QLEV:02d}.png" if use_trixels else f"{ALT_DIR}snodas_sierra_nevada_gids_zoom_{QLEV:02d}.png"
+            # if trixel_flip:
+            #    pname = pname.replace("zoomtrixel", "zoomfliptrixel")
+            # elif double_trixel:
+            #     pname = pname.replace("zoomtrixel", "zoom2trixel")
+            # plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, sierra_nevada_gids, sierra_nevada_roi, snodas_w_sdf,
+            #            add_trixels=use_trixels, flip_trixels=trixel_flip, trixel_double=double_trixel, zoomin=True)
+            # if verbose:
+            #     print(f"Saved {pname}")
+
+            # ##
+            # # Plot the Feather River grids
+            # if mixed_qlev:
+            #     pname = f"{ALT_DIR}snodas_feather_river_gids_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png"
+            # else:
+            #     pname = f"{ALT_DIR}snodas_feather_river_gids_{QLEV:02d}.png"
+            # plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, feather_river_gids, feather_river_roi, snodas_w_sdf,
+            #            add_trixels=False, flip_trixels=False, trixel_double=False, zoomin=False)
+            # if verbose:
+            #     print(f"Saved {pname}")
+            if mixed_qlev:
+                pname = f"{ALT_DIR}snodas_feather_river_gids_zoomtrixel_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png" if use_trixels else f"{ALT_DIR}snodas_feather_river_gids_zoom_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png"
             else:
-                tuolumne_river_sdf = None
-            os._exit(1)
-
-            ##
-            # Plot SNODAS_W
-            pname = f"{ALT_DIR}snodas_w_masked_{QLEV:02d}.png"
-            plot_conusw(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, snodas_w_masked_gids)
-            if verbose:
-                print(f"\nSaved {pname}")
-
-            ##
-            # Plot the Regions
-            pname = f"{ALT_DIR}snodas_regions_{QLEV:02d}.png"
-            plot_conus_regions(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons)
+                pname = f"{ALT_DIR}snodas_feather_river_gids_zoomtrixel_{QLEV:02d}.png" if use_trixels else f"{ALT_DIR}snodas_feather_river_gids_zoom_{QLEV:02d}.png"
+            if trixel_flip:
+               pname = pname.replace("zoomtrixel", "zoomfliptrixel")
+            elif double_trixel:
+                pname = pname.replace("zoomtrixel", "zoom2trixel")
+            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, feather_river_gids, feather_river_roi, snodas_w_sdf,
+                      add_trixels=use_trixels, flip_trixels=trixel_flip, trixel_double=double_trixel, zoomin=True)
             if verbose:
                 print(f"Saved {pname}")
 
-            ##
-            # Plot the Sierra Nevada grids
-            pname = f"{ALT_DIR}snodas_sierra_nevada_gids_{QLEV:02d}.png"
-            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, sierra_nevada_gids, sierra_nevada_roi, False, zoomin=False)
-            if verbose:
-                print(f"Saved {pname}")
-            pname = f"{ALT_DIR}snodas_sierra_nevada_gids_zoom_{QLEV:02d}.png"
-            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, sierra_nevada_gids, sierra_nevada_roi, use_trixels, zoomin=True)
-            if verbose:
-                print(f"Saved {pname}")
-
-            ##
-            # Plot the Feather River grids
-            pname = f"{ALT_DIR}snodas_feather_river_gids_{QLEV:02d}.png"
-            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, feather_river_gids, feather_river_roi, False, zoomin=False)
-            if verbose:
-                print(f"Saved {pname}")
-            pname = f"{ALT_DIR}snodas_feather_river_gids_zoom_{QLEV:02d}.png"
-            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, feather_river_gids, feather_river_roi, use_trixels, zoomin=True)
-            if verbose:
-                print(f"Saved {pname}")
-
-            # #
-            # Plot the Tuolumne River grids
-            pname = f"{ALT_DIR}snodas_tuolumne_river_gids_{QLEV:02d}.png"
-            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, tuolumne_river_gids, tuolumne_river_roi, False, zoomin=False)
-            if verbose:
-                print(f"Saved {pname}")
-            pname = f"{ALT_DIR}snodas_tuolumne_river_gids_zoom_{QLEV:02d}.png"
-            plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, tuolumne_river_gids, tuolumne_river_roi, use_trixels, zoomin=True)
-            if verbose:
-                print(f"Saved {pname}")
+            # # # Plot the Tuolumne River grids
+            # if mixed_qlev:
+            #     pname = f"{ALT_DIR}snodas_tuolumne_gids_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png"
+            # else:
+            #     pname = f"{ALT_DIR}snodas_tuolumne_gids_{QLEV:02d}.png"
+            # # plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, tuolumne_river_gids, tuolumne_river_roi, snodas_w_sdf,
+            #              add_trixels=False, flip_trixels=False, zoomin=False)
+            # # if verbose:
+            # #     print(f"Saved {pname}")
+            # if mixed_qlev:
+            #     pname = f"{ALT_DIR}snodas_tuolumne_gids_zoomtrixel_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png" if use_trixels else f"{ALT_DIR}snodas_tuolumne_gids_zoom_{QLEV_DGRID:02d}_{QLEV_BASIN:02d}.png"
+            # else:
+            #     pname = f"{ALT_DIR}snodas_tuolumne_gids_zoomtrixel_{QLEV:02d}.png" if use_trixels else f"{ALT_DIR}snodas_tuolumne_gids_zoom_{QLEV:02d}.png"
+            # if trixel_flip:
+            #    pname = pname.replace("zoomtrixel", "zoomfliptrixel")
+            # elif double_trixel:
+            #     pname = pname.replace("zoomtrixel", "zoom2trixel")
+            # plot_grids(pname, snodas_lats2d, snodas_lons2d, snodas_npts, snodas_nlats, snodas_nlons, tuolumne_river_gids, tuolumne_river_roi, snodas_w_sdf,
+            #            add_trixels=use_trixels, flip_trixels=trixel_flip, trixel_double=double_trixel, zoomin=True)
+            # if verbose:
+            #     print(f"Saved {pname}")
     return
 
 #---Start of main code block.
 if __name__=='__main__':
 
+    # Send some informative output to standard I/O
     verbose     = [False, True][1]
 
-    make_basins = [False, True][1]
-    make_plk    = [False, True][1]
-    make_grids  = [False, True][1]
+    # Use QLEV_BASIN and QLEV_DGRID rather than unified QLEV encodings
+    mixed_qlev = [False, True][0]
 
+    # Use a narrow version of CONUS_W for faster graphics
+    shrink_conusw = [False, True][1]
+
+    # Make Basin DataFrames (rather than read)
+    make_basins = [False, True][0]
+    # Make Datagrid DataFrames (rather than read)
+    make_dgrid  = [False, True][0]
+    # Make Datagrid-Basin Intersection DataFrames (rather than read)
+    make_grids  = [False, True][0]
+    if shrink_conusw and make_grids:
+        raise Exception("Warning can't use shrink_conusw and make_grids together!")
+
+    # Make some plots
     make_plot   = [False, True][1]
-    use_trixels = [False, True][0]
+    # Add basin trixels to some plots
+    use_trixels = [False, True][1]
+    # Do a reverse and show datagrid trixels and basin polygon (use_trixels must be True)
+    trixel_flip = [False, True][0]
+    # Show basin and datagrid trixels rather than datagrid grids
+    double_trixel = [False, True][0]
+    if double_trixel and trixel_flip:
+        raise Exception("Warning can't use double_trixel and trixel_flip together!")
+    if trixel_flip or double_trixel:
+        use_trixels =  True
 
-    demo_get_grids(make_basins, make_plk, make_grids, make_plot, use_trixels, verbose)
+    ##
+    # Main Routine
+    demo_get_basin(mixed_qlev, shrink_conusw, make_basins, make_dgrid, make_grids, make_plot, use_trixels, trixel_flip, double_trixel, verbose)
 
 # >>>> ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: <<<<
 # >>>> END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE | END OF FILE <<<<
