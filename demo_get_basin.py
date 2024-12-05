@@ -71,13 +71,13 @@ Q-13 ~Length Scale:  1.25 km      Q-27  ~Length Scale:  7.62939E-05 km
 
 """
 #       0   1   2   3   4   5   6
-QLEV = [10, 12, 14, 15, 16, 17, 18][6]
+QLEV = [10, 12, 14, 15, 16, 17, 18][1]
 
 #             0   1   2   3   4   5   6
 QLEV_BASIN = [10, 12, 14, 15, 16, 17, 18][6]
 
 #             0   1   2   3   4   5   6
-QLEV_DGRID = [10, 12, 14, 15, 16, 17, 18][2]
+QLEV_DGRID = [10, 12, 14, 15, 16, 17, 18][3]
 
 ##
 # Parallel computing settings.
@@ -345,7 +345,10 @@ def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, mak
         Flag to print verbose output.
     """
     if verbose:
-        print(f"\nUsing QLEV {QLEV}")
+        if mixed_qlev:
+            print(f"\nUsing QLEV-disparity QLEV_BASIN-{QLEV_BASIN:02d} & QLEV_DGRID-{QLEV_DGRID:02d}")
+        else:
+            print(f"\nUsing QLEV-parity {QLEV}")
 
     if mixed_qlev:
         sierra_nevada_pkl_file = f"{ALT_DIR}sierra_nevada_{QLEV_BASIN:02d}.pkl"
@@ -358,6 +361,8 @@ def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, mak
 
     if make_basins:
         use_qlev = QLEV_BASIN if mixed_qlev else QLEV
+        if verbose:
+            print(f"\nEncoding Basin at Q-{use_qlev:02d}")
         ##
         # Get Sierra Nevada Basin
         sierra_nevada_file = f"{ALT_DIR}Sierra_Nevada_Conservancy_Boundary.geojson"
@@ -442,6 +447,8 @@ def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, mak
         else:
             grid_file = f"{ALT_DIR}snodas_basin_grids_{use_qlev:02d}.pkl"
         if make_dgrid:
+            if verbose:
+                print(f"\nEncoding Data-Grid at Q-{use_qlev:02d}")
             ##
             # Read the SNODAS datagrid lon/lats from src geotif
             ffiles = sorted(glob.glob(f'{SRC_DIR}{SRC_SDIR}*'))
@@ -611,7 +618,6 @@ def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, mak
                 print(f"\nReading {basin_file}")
             with open(basin_file, 'rb') as f:
                 odat = pickle.load(f)
-
             (sdf_full, snodas_lats2d, snodas_lons2d, snodas_lats, snodas_lons, snodas_nlats,
              snodas_nlons, snodas_npts, sdf_extra, snodas_external_npts, snodas_external_gids,
              sdf_masked, conus_masked_npts, sdfw, conusw_npnts, sdfw_extra, conusw_external_npts,
@@ -622,6 +628,8 @@ def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, mak
         del odat
 
         if make_grids:
+            if verbose:
+                print(f"\nFinding Intersections")
             ##
             # Intersect Sierra Nevada Conservancy with SNODAS_W
             """
@@ -775,7 +783,7 @@ if __name__=='__main__':
     mixed_qlev = [False, True][0]
 
     # Use a narrow version of CONUS_W for faster graphics
-    shrink_conusw = [False, True][1]
+    shrink_conusw = [False, True][0]
 
     # Make Basin DataFrames (rather than read)
     make_basins = [False, True][0]
