@@ -71,13 +71,13 @@ Q-13 ~Length Scale:  1.25 km      Q-27  ~Length Scale:  7.62939E-05 km
 
 """
 #       0   1   2   3   4   5   6
-QLEV = [10, 12, 14, 15, 16, 17, 18][1]
+QLEV = [10, 12, 14, 15, 16, 17, 18][6]
 
 #             0   1   2   3   4   5   6
 QLEV_BASIN = [10, 12, 14, 15, 16, 17, 18][6]
 
 #             0   1   2   3   4   5   6
-QLEV_DGRID = [10, 12, 14, 15, 16, 17, 18][3]
+QLEV_DGRID = [10, 12, 14, 15, 16, 17, 18][1]
 
 ##
 # Parallel computing settings.
@@ -684,6 +684,20 @@ def demo_get_basin(mixed_qlev: bool, shrink_conusw: bool, make_basins: bool, mak
             (sierra_nevada_gdf, sierra_nevada_gids, feather_river_gdf, feather_river_gids, tuolumne_river_gdf, tuolumne_river_gids) = odat
         del odat
 
+        ##
+        # Cover SID count
+        # dgrid_sids = snodas_w_sdf['sids'].to_numpy()
+        # print(f"{len(dgrid_sids) = }")
+        # dgrid_cover = starepandas.compress_sids(dgrid_sids)
+        # print(f"{len(dgrid_cover) = }")
+
+        # basin_sids = feather_river_roi['sids'].to_numpy()
+        # print(f"{basin_sids = }")
+        # print(f"{len(basin_sids) = }")
+        # basin_cover = starepandas.compress_sids(basin_sids)
+        # print(f"{len(basin_cover) = }")
+        # os._exit(1)
+
         if make_plot:
             if verbose:
                 print(f"\nMaking Plots ...")
@@ -795,7 +809,7 @@ if __name__=='__main__':
         raise Exception("Warning can't use shrink_conusw and make_grids together!")
 
     # Make some plots
-    make_plot   = [False, True][1]
+    make_plot   = [False, True][0]
     # Add basin trixels to some plots
     use_trixels = [False, True][1]
     # Do a reverse and show datagrid trixels and basin polygon (use_trixels must be True)
